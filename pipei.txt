@@ -1,0 +1,113 @@
+"""
+关键词映射脚本
+将原始关键词通过精确匹配、同义词映射和模糊匹配，关联到固定的标准关键词。
+依赖库：rapidfuzz (安装：pip install rapidfuzz)
+"""
+
+import json
+from rapidfuzz import process, fuzz
+
+# ---------------------------- 配置区 ----------------------------
+RAW_KEYWORDS_FILE = "raw_keywords.txt"      # 原始关键词列表，每行一个词
+STD_KEYWORDS_FILE = "std_keywords.txt"      # 标准关键词列表，每行一个词
+SYNONYMS_FILE = "synonyms.json"              # 同义词映射文件 (JSON格式)
+OUTPUT_FILE = "mapped_keywords.txt"          # 输出映射后的关键词列表
+FUZZY_THRESHOLD = 80                          # 模糊匹配分数阈值 (0-100)
+# ---------------------------------------------------------------
+
+def load_keywords(file_path):
+    """从文本文件加载关键词，返回去重后的列表（保留顺序？不重要）"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        # 去除空行和首尾空格
+        keywords = [line.strip() for line in f if line.strip()]
+    return keywords
+
+def load_synonyms(file_path):
+    """从JSON文件加载同义词映射，返回字典"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        synonyms = json.load(f)
+    return synonyms
+
+def normalize(text):
+    """简单规范化：去除首尾空格（可根据需要增加更多处理，如小写化）"""
+    return text.strip()
+
+def match_keyword(raw, std_list, synonyms, threshold=FUZZY_THRESHOLD):
+    """
+    将原始关键词 raw 匹配到标准词列表 std_list 中的某一个。
+    匹配策略优先级：
+      1. 精确匹配（忽略首尾空格）
+      2. 同义词映射
+      3. 模糊匹配 (partial_ratio, 后尝试 token_sort_ratio)
+    如果所有匹配失败，返回原始词本身。
+    """
+    raw_norm = normalize(raw)
+
+    # 1. 精确匹配
+    for std in std_list:
+        if normalize(std) == raw_norm:
+            return std
+
+    # 2. 同义词映射
+    if raw in synonyms:
+        return synonyms[raw]
+
+    # 3. 模糊匹配：先用 partial_ratio（适合包含关系，如“肉毒素”匹配“肉毒素注射”）
+    match = process.extractOne(raw, std_list, scorer=fuzz.partial_ratio, score_cutoff=threshold)
+    if match:
+        return match[0]
+
+    # 4. 若 partial_ratio 失败，尝试 token_sort_ratio（处理词序打乱的情况）
+    match = process.extractOne(raw, std_list, scorer=fuzz.token_sort_ratio, score_cutoff=threshold)
+    if match:
+        return match[0]
+
+    # 5. 完全无法匹配，返回原始词（可自定义标记为"未匹配"）
+    return raw
+
+def main():
+    print("正在加载标准关键词...")
+    std_keywords = load_keywords(STD_KEYWORDS_FILE)
+    print(f"标准关键词数量: {len(std_keywords)}")
+
+    print("正在加载同义词映射...")
+    synonyms = load_synonyms(SYNONYMS_FILE)
+    print(f"同义词条目数: {len(synonyms)}")
+
+    print("正在加载原始关键词...")
+    raw_keywords = load_keywords(RAW_KEYWORDS_FILE)
+    print(f"原始关键词数量: {len(raw_keywords)}")
+
+    # 对原始关键词去重，减少重复计算
+    unique_raw = set(raw_keywords)
+    print(f"去重后待匹配词数: {len(unique_raw)}")
+
+    # 缓存匹配结果
+    cache = {}
+    for i, raw in enumerate(unique_raw, 1):
+        cache[raw] = match_keyword(raw, std_keywords, synonyms)
+        if i % 100 == 0:
+            print(f"已匹配 {i} / {len(unique_raw)} 个词")
+
+    # 对原始列表进行映射
+    mapped = [cache[raw] for raw in raw_keywords]
+
+    # 输出到文件
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+        for item in mapped:
+            f.write(item + '\n')
+
+    print(f"映射完成，结果已保存至 {OUTPUT_FILE}")
+
+    # 可选：打印一些统计信息
+    unique_mapped = set(mapped)
+    print(f"映射后标准词种数: {len(unique_mapped)}")
+    # 检查是否有未匹配的词（即映射后仍保留原词的）
+    unmatched = [raw for raw, mapped in zip(raw_keywords, mapped) if raw == mapped]
+    if unmatched:
+        print(f"警告：有 {len(unmatched)} 个词未能匹配到标准词，已保留原值。")
+        # 可以打印前几个示例
+        print("未匹配示例:", unmatched[:5])
+
+if __name__ == "__main__":
+    main()

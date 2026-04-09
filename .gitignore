@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Build outputs
+build/
+dist/
+*.spec
+skills/
+
+# Local runtime outputs
+202[0-9]-[0-1][0-9]/
+日志*.txt
+失败列表+*.txt
+录单反馈+*.xlsx
+重单记录_*.txt
+
+# Archives and binaries
+*.rar
+*.zip
+*.exe
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
