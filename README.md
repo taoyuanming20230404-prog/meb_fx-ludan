@@ -65,13 +65,31 @@ Excel（`.xlsx`）建议包含列：
 build_windows.bat
 ```
 
-## Git 更新
+## 常见问题排查
 
-日常提交命令：
+### 1. `git push` 报连接超时
+
+如果本机启用了 Clash 等代理，建议为 Git 配置代理端口后重试：
+
+```bash
+git config --global http.proxy http://127.0.0.1:7897
+git config --global https.proxy http://127.0.0.1:7897
+git push
+```
+
+### 2. Chrome 无法启动或驱动不匹配
+
+- 检查 Chrome 与 ChromeDriver 主版本是否一致
+- 优先将 `chromedriver.exe` 放在程序同目录
+
+### 3. 提交状态与后台不一致
+
+当前程序使用“2 秒提示检测 + 轻量页面校验”判定是否成功。若仍有个别误判，建议结合后台查询复核异常号码。
+
+## Git 日常更新
 
 ```bash
 git add .
 git commit -m "your message"
 git push
 ```
-
